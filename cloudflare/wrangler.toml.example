@@ -1,0 +1,12 @@
+name = "paperpulse-api"
+main = "worker/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Comma-separated exact origins. Use your production domain and local Vite origin only while developing.
+ALLOWED_ORIGINS = "http://localhost:5173,https://your-paperpulse-domain.example"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "paperpulse-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
