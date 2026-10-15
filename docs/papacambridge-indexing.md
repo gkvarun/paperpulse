@@ -20,6 +20,33 @@ npm run build
 
 The importer downloads the listed PDFs, extracts text with PDF.js, and writes a frontend-compatible index. It does not crawl PapaCambridge, guess hidden PDF URLs, or bypass access restrictions. If a source blocks automated downloads, use its permitted download flow and process locally saved PDFs instead.
 
+## Generate the PDF URL list from Paper Finder
+
+The Paper Finder uses `src/data/subjects.ts` for supported syllabus codes, qualifications, years, sessions, paper components and variants, and `src/lib/papacambridge.ts` to construct PapaCambridge direct PDF links. Do not manually recreate those mappings: use the exporter, which imports those same selector definitions.
+
+Install dependencies, then export the generated question-paper links:
+
+```bash
+npm install
+npm run export:paper-urls -- --from 2012 --to 2026 --out ./papacambridge-pdf-urls.txt
+```
+
+To export just one subject, pass its ID, for example:
+
+```bash
+npm run export:paper-urls -- --subject physics --from 2012 --to 2026
+```
+
+The command writes a text URL list plus a JSON manifest with selector metadata. By default, it exports every URL implied by the Paper Finder selectors; some combinations may not exist on the source. To attempt filtering to URLs confirmed by concurrent HTTP HEAD checks, add `--check` (some servers do not support HEAD consistently, so inspect the resulting list).
+
+Then run the importer on the generated list:
+
+```bash
+node scripts/import-papacambridge-pdfs.mjs ./papacambridge-pdf-urls.txt ./public/question-index.json
+```
+
+The importer skips inaccessible, missing, or non-PDF responses and reports which PDFs produced segmented records. Start with a single subject or small year range, inspect the output and server response behavior, then expand to the complete set. Bulk indexing can take significant time and bandwidth; comply with the source site's terms and avoid overwhelming the host.
+
 ## Question segmentation status and limits
 
 The importer now uses PDF.js text positions to reconstruct reading-order lines, detects likely top-level question numbers at the left margin, and emits separate records for recognizable subparts such as `(a)`, `(b)`, and `(i)`. Each sub-question retains the question stem, parent question number, source URL, and source page range. A small syllabus-keyword classifier assigns a likely topic where possible; records retain `reviewRequired: true` because layout and topic classification are heuristic.
