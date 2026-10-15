@@ -34,7 +34,7 @@ export function keywordScore(query: string, item: IndexedQuestion): number {
   return coverage * 3 + phraseBonus + topicBonus * 0.5 + promptBonus * 0.25;
 }
 
-export async function semanticSearch<T extends IndexedQuestion>(query: string, items: T[], limit = 100): Promise<T[]> {
+export async function keywordSearch<T extends IndexedQuestion>(query: string, items: T[], limit = 100): Promise<T[]> {
   if (!query.trim()) return items.slice(0, limit);
   return items
     .map((item, index) => ({ item, index, score: keywordScore(query, item) }))
