@@ -20,13 +20,14 @@ export function QuestionCard({ question }: { question: TopicalQuestion }) {
   const pagePassage = (question as any).recordType === "page-passage";
   const sourceUrl = (question as any).sourceUrl as string | undefined;
   const sourcePage = (question as any).sourcePage as number | undefined;
+  const seriesCode = String(question.series);
 
   return (
     <motion.li layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
       <Card as="article" className={clsx("p-5 transition-colors hover:border-line-strong", inWorksheet && "border-foreground")}>
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge className="border-foreground font-bold text-foreground">{question.topic}</Badge>
-          <Badge>{question.series === "unknown" ? "Session unknown" : seriesLabel(question.series)} {question.year || "Year unknown"}</Badge>
+          <Badge>{seriesCode === "unknown" ? "Session unknown" : seriesLabel(question.series)} {question.year || "Year unknown"}</Badge>
           <Badge>Paper {question.paper}</Badge>
           <Badge>{pagePassage ? `Page ${sourcePage ?? question.questionNumber}` : `Q${question.questionNumber}`}</Badge>
           {!pagePassage && <Badge>{question.marks} {question.marks === 1 ? "mark" : "marks"}</Badge>}
