@@ -11,10 +11,10 @@ export type IndexedQuestion = {
 };
 
 const norm = (s: string) => s.toLowerCase().normalize("NFKD")
-  .replace(/[\\u0300-\\u036f]/g, "")
-  .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^\p{L}\p{N}]+/gu, " ")
   .trim();
-const tokens = (s: string) => [...new Set(norm(s).split(/\\s+/).filter(t => t.length > 1))];
+const tokens = (s: string) => [...new Set(norm(s).split(/\s+/).filter(t => t.length > 1))];
 
 /** Ranks exact phrases, all-term matches, and partial term matches without model inference. */
 export function keywordScore(query: string, item: IndexedQuestion): number {
