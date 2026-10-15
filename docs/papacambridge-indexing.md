@@ -20,8 +20,19 @@ npm run build
 
 The importer downloads the listed PDFs, extracts text with PDF.js, and writes a frontend-compatible index. It does not crawl PapaCambridge, guess hidden PDF URLs, or bypass access restrictions. If a source blocks automated downloads, use its permitted download flow and process locally saved PDFs instead.
 
-## Current extraction limitations
+## Question segmentation status and limits
 
-The importer creates **page-level passages**, not verified individual questions. Each imported passage is marked `reviewRequired: true` and `topic: "Unclassified"`. This makes text searchable but does not yet satisfy complete topical question extraction. Scanned PDFs require OCR, and page layouts with diagrams/tables need extra handling. Before advertising the index as a complete topical bank, add question/sub-question segmentation, topic classification against the relevant syllabus, and validation against the original PDF.
+The importer now uses PDF.js text positions to reconstruct reading-order lines, detects likely top-level question numbers at the left margin, and emits separate records for recognizable subparts such as `(a)`, `(b)`, and `(i)`. Each sub-question retains the question stem, parent question number, source URL, and source page range. A small syllabus-keyword classifier assigns a likely topic where possible; records retain `reviewRequired: true` because layout and topic classification are heuristic.
 
-For larger collections, precompute embeddings during ingestion and return them in the API/index rather than generating every embedding in the student's browser. Set `VITE_TOPICAL_SEARCH_API_URL` in the deployment environment to use a deployed index API.
+This is **best-effort segmentation, not guaranteed-perfect extraction**. Cambridge papers differ in layout and numbering, and a line that resembles a question number can be misidentified. Text-only extraction can lose reading order around multi-column layouts, tables, equations and diagrams. Image-only scanned pages need OCR, and visual subparts may need manual review. Mark schemes are not merged into extracted question records by this script.
+
+## Verify the output
+
+1. Run the importer on a small batch first.
+2. Open `public/question-index.json` and check each record's `prompt`, `questionNumber`, `parentQuestionNumber`, `sourceUrl`, `sourcePage`, `sourcePageEnd`, and `topic`.
+3. Compare the extracted record against the cited page in the original PDF.
+4. Re-run on the full authorized URL list only after the sample is acceptable.
+
+The importer emits question/sub-question records rather than raw page passages when it detects boundaries. If it cannot detect any question boundaries in a PDF, it warns and emits no records for that PDF rather than pretending pages are questions.
+
+For larger collections, precompute embeddings during ingestion and return them in the API/index rather than generating every document vector in the student's browser. Set `VITE_TOPICAL_SEARCH_API_URL` in the deployment environment to use a deployed index API.
