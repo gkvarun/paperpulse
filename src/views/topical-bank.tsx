@@ -7,6 +7,7 @@ import { QUESTIONS } from "../data/questions";
 import { SUBJECTS, TRACKER_YEARS, YEARS, getSubject, subjectPapers } from "../data/subjects";
 import { Button, Card, EmptyState, Field, PageHeader, Select } from "../components/ui";
 import { QuestionCard } from "../components/question-card";
+import { semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
 
 const MIN_YEAR = YEARS[YEARS.length - 1];
 const MAX_YEAR = YEARS[0];
@@ -19,6 +20,9 @@ export function TopicalBank() {
   const [from, setFrom] = useState(MIN_YEAR);
   const [to, setTo] = useState(MAX_YEAR);
   const [search, setSearch] = useState("");
+  const [semanticResults, setSemanticResults] = useState<typeof QUESTIONS>(QUESTIONS);
+  const [searching, setSearching] = useState(false);
+  const [searchMode, setSearchMode] = useState<"semantic" | "keyword">("semantic");
 
   const subject = getSubject(subjectId);
   const papers = subjectPapers(subject);
@@ -38,18 +42,43 @@ export function TopicalBank() {
     consumeTopicalIntent();
   }, [topicalIntent, consumeTopicalIntent]);
 
+  // Run semantic retrieval over the currently available question records, then apply
+  // exact metadata filters. When an indexed corpus/API is configured, its records can
+  // be merged here; the bundled seed data is not a complete Cambridge catalogue.
+  useEffect(() => {
+    let cancelled = false;
+    setSearching(true);
+    const run = async () => {
+      const ranked = search.trim()
+        ? await semanticSearch(search, QUESTIONS as unknown as IndexedQuestion[], 5000)
+        : QUESTIONS;
+      if (!cancelled) {
+        setSemanticResults(ranked as typeof QUESTIONS);
+        setSearchMode(search.trim() ? "semantic" : "keyword");
+        setSearching(false);
+      }
+    };
+    void run().catch((error) => {
+      console.error("Topical semantic search failed", error);
+      if (!cancelled) {
+        setSemanticResults(QUESTIONS);
+        setSearchMode("keyword");
+        setSearching(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [search]);
+
   const results = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return QUESTIONS.filter(
+    return semanticResults.filter(
       (x) =>
         x.subjectId === subjectId &&
         (topics.length === 0 || topics.includes(x.topic)) &&
         (component === "all" || Number(x.paper[0]) === component) &&
         x.year >= Math.min(from, to) &&
-        x.year <= Math.max(from, to) &&
-        (!q || x.prompt.toLowerCase().includes(q) || x.topic.toLowerCase().includes(q)),
+        x.year <= Math.max(from, to)
     ).sort((a, b) => b.year - a.year);
-  }, [subjectId, topics, component, from, to, search]);
+  }, [semanticResults, subjectId, topics, component, from, to]);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
@@ -194,13 +223,13 @@ export function TopicalBank() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search within questions"
+                placeholder="Search by topic or question meaning"
                 aria-label="Search within questions"
                 className="h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-sm placeholder:text-muted"
               />
             </div>
             <p className="text-sm text-muted" aria-live="polite">
-              <span className="font-bold text-foreground">{results.length}</span> {results.length === 1 ? "question" : "questions"}
+              <span className="font-bold text-foreground">{results.length}</span> {results.length === 1 ? "question" : "questions"}{searching ? " · searching…" : search.trim() ? ` · ${searchMode} search` : ""}
             </p>
           </div>
 
