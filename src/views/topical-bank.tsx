@@ -69,7 +69,7 @@ export function TopicalBank() {
     return semanticResults.filter(
       (x) =>
         x.subjectId === subjectId &&
-        (topics.length === 0 || topics.includes(x.topic) || (x.topic === "Unclassified" && (x as any).recordType === "page-passage")) &&
+        (topics.length === 0 || topics.includes(x.topic) || (x.topic === "Unclassified" && Boolean((x as any).recordType))) &&
         (component === "all" || Number(x.paper[0]) === component) &&
         x.year >= Math.min(from, to) &&
         x.year <= Math.max(from, to)
