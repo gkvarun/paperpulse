@@ -55,12 +55,7 @@ export function TopicalBank() {
     }; void load(); return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const prepare = async () => { const rows = await Promise.all(corpus.map(async (q) => { if (q.embedding?.length) return q; const embedding = await embedText(q.topic + ". " + q.prompt); return embedding ? { ...q, embedding } : q; })); if (!cancelled) setCorpus(rows); };
-    void prepare().catch((e) => console.warn("Embedding preparation failed.", e));
-    return () => { cancelled = true; };
-  }, [corpusSource]);
+  // Corpus embeddings are generated during ingestion; only the user's query is embedded here.
 
   useEffect(() => {
     let cancelled = false; setSearching(true);
