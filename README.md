@@ -35,3 +35,9 @@ The past-paper entries and dashboard metrics in the UI are sample data, not a co
 ## Current limitations
 
 The frontend's other screens are still demo-driven until their read/write actions are connected to the API. The account form can call the Worker once configured. This repo does not mean the website is deployed; Cloudflare Pages or another hosting target still needs to be configured.
+
+## Topical semantic search and PDF indexing
+
+The Topical Bank now tries a configured indexed-question API (`VITE_TOPICAL_SEARCH_API_URL`), then `public/question-index.json`, and only then the bundled demo questions. The current source is shown beside the result count so demo results are not mistaken for an imported catalogue.
+
+To import a list of direct PDF URLs you are authorized to process, see [the PapaCambridge/PDF indexing guide](docs/papacambridge-indexing.md) and run `node scripts/import-papacambridge-pdfs.mjs ./papacambridge-pdf-urls.txt ./public/question-index.json`. The current importer indexes extracted **page passages**, not validated individual questions; full question segmentation and topic classification remain future work. It does not crawl or bypass third-party site restrictions.
