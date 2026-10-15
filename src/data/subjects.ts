@@ -24,8 +24,8 @@ export const SERIES: { code: SeriesCode; label: string; short: string }[] = [
   { code: "w", label: "Oct/Nov", short: "ON" },
 ];
 
-export const YEARS = Array.from({ length: 10 }, (_, i) => 2024 - i);
-export const TRACKER_YEARS = Array.from({ length: 7 }, (_, i) => 2024 - i);
+export const YEARS = Array.from({ length: 15 }, (_, i) => 2026 - i);
+export const TRACKER_YEARS = Array.from({ length: 7 }, (_, i) => 2026 - i);
 
 /** Feb/March only publishes variant 2; June and November publish 1–3. */
 export const variantsFor = (series: SeriesCode) => (series === "m" ? [2] : [1, 2, 3]);
