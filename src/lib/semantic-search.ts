@@ -25,10 +25,13 @@ export function keywordScore(query: string, item: IndexedQuestion) {
   const matched=q.filter(t=>text.includes(t)).length;
   return matched/q.length + (norm(item.topic).includes(norm(query)) ? 1 : 0);
 }
+let extractorPromise: Promise<any> | null = null;
 export async function embedText(text: string): Promise<number[] | null> {
   try {
-    const { pipeline } = await import("@xenova/transformers");
-    const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    if (!extractorPromise) {
+      extractorPromise = import("@xenova/transformers").then(({ pipeline }) => pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2"));
+    }
+    const extractor = await extractorPromise;
     const output = await extractor(text, { pooling: "mean", normalize: true });
     return Array.from(output.data as Float32Array);
   } catch (error) {
