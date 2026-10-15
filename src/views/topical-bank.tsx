@@ -225,7 +225,7 @@ export function TopicalBank() {
               />
             </div>
             <p className="text-sm text-muted" aria-live="polite">
-              <span className="font-bold text-foreground">{results.length}</span> {results.length === 1 ? "question" : "questions"}{searching ? " · searching…" : search.trim() ? ` · ${searchMode} search` : ""} · {corpusSource === "bundled" ? "demo data" : corpusSource === "api" ? "indexed question API" : "published index"}
+              <span className="font-bold text-foreground">{results.length}</span> {results.length === 1 ? (corpusSource === "bundled" ? "question" : "result") : (corpusSource === "bundled" ? "questions" : "results")}{searching ? " · searching…" : search.trim() ? ` · ${searchMode} search` : ""} · {corpusSource === "bundled" ? "demo data" : corpusSource === "api" ? "indexed question API" : "published index"}
             </p>
           </div>
 
