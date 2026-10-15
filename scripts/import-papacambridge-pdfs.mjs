@@ -24,8 +24,8 @@ const subjectByCode = {
   "0625": "physics", "9702": "physics",
   "0620": "chemistry", "9701": "chemistry",
   "0580": "mathematics", "9709": "mathematics",
-  "9231": "further-math", "9626": "it", "9618": "computer-science",
-  "0478": "computer-science", "0417": "it", "0606": "additional-math",
+  "9231": "further-math", "0606": "further-math", "9626": "it", "9618": "computer-science",
+  "0478": "computer-science", "0417": "it",
   "0580": "mathematics", "0610": "biology", "9700": "biology"
 };
 const records = [];
