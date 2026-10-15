@@ -1,51 +1,45 @@
 /**
- * PaperPulse semantic retrieval.
- *
- * Uses @xenova/transformers in the browser when an embedding index is present.
- * Index records are produced by scripts/build-question-index.mjs from PDFs the
- * operator is authorized to process. Keyword matching remains a graceful fallback.
+ * Lightweight client-side keyword search for indexed past-paper questions.
+ * No embedding model, model download, vector database, or external API is required.
  */
 export type IndexedQuestion = {
   id: string; subjectId: string; topic: string; year: number; series: string;
   paper: string; questionNumber: number; marks: number; prompt: string;
   markScheme: string[]; embedding?: number[];
+  sourceUrl?: string; pageStart?: number; pageEnd?: number;
+  recordType?: string;
 };
 
-const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
-const tokens = (s: string) => norm(s).split(" ").filter(Boolean);
-export function cosineSimilarity(a: number[], b: number[]) {
-  if (!a.length || a.length !== b.length) return 0;
-  let dot=0, aa=0, bb=0;
-  for (let i=0;i<a.length;i++){ dot+=a[i]*b[i]; aa+=a[i]*a[i]; bb+=b[i]*b[i]; }
-  return aa && bb ? dot/(Math.sqrt(aa)*Math.sqrt(bb)) : 0;
+const norm = (s: string) => s.toLowerCase().normalize("NFKD")
+  .replace(/[\\u0300-\\u036f]/g, "")
+  .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+  .trim();
+const tokens = (s: string) => [...new Set(norm(s).split(/\\s+/).filter(t => t.length > 1))];
+
+/** Ranks exact phrases, all-term matches, and partial term matches without model inference. */
+export function keywordScore(query: string, item: IndexedQuestion): number {
+  const q = tokens(query);
+  if (!q.length) return 0;
+  const topic = norm(item.topic || "");
+  const prompt = norm(item.prompt || "");
+  const markScheme = norm((item.markScheme || []).join(" "));
+  const text = `${topic} ${prompt} ${markScheme}`;
+  const matched = q.filter(t => text.includes(t)).length;
+  if (!matched) return 0;
+  const coverage = matched / q.length;
+  const phrase = norm(query);
+  const phraseBonus = phrase.length > 2 && text.includes(phrase) ? 1.5 : 0;
+  const topicBonus = q.filter(t => topic.includes(t)).length / q.length;
+  const promptBonus = q.filter(t => prompt.includes(t)).length / q.length;
+  return coverage * 3 + phraseBonus + topicBonus * 0.5 + promptBonus * 0.25;
 }
-export function keywordScore(query: string, item: IndexedQuestion) {
-  const q=tokens(query); if(!q.length) return 0;
-  const text=norm([item.topic,item.prompt].join(" "));
-  const matched=q.filter(t=>text.includes(t)).length;
-  return matched/q.length + (norm(item.topic).includes(norm(query)) ? 1 : 0);
-}
-let extractorPromise: Promise<any> | null = null;
-export async function embedText(text: string): Promise<number[] | null> {
-  try {
-    if (!extractorPromise) {
-      extractorPromise = import("@xenova/transformers").then(({ pipeline }) => pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2"));
-    }
-    const extractor = await extractorPromise;
-    const output = await extractor(text, { pooling: "mean", normalize: true });
-    return Array.from(output.data as Float32Array);
-  } catch (error) {
-    console.warn("Semantic model unavailable; using keyword retrieval.", error);
-    return null;
-  }
-}
-export async function semanticSearch<T extends IndexedQuestion>(query: string, items: T[], limit = 100) {
+
+export async function semanticSearch<T extends IndexedQuestion>(query: string, items: T[], limit = 100): Promise<T[]> {
   if (!query.trim()) return items.slice(0, limit);
-  const qv = await embedText(query);
-  const ranked = items.map(item => {
-    const semantic = qv && item.embedding ? cosineSimilarity(qv, item.embedding) : 0;
-    const lexical = keywordScore(query, item);
-    return { item, score: qv && item.embedding ? semantic * 0.8 + Math.min(lexical, 2) * 0.1 : lexical };
-  }).filter(x => x.score > 0).sort((a,b)=>b.score-a.score);
-  return ranked.slice(0,limit).map(x=>x.item);
+  return items
+    .map((item, index) => ({ item, index, score: keywordScore(query, item) }))
+    .filter(row => row.score > 0)
+    .sort((a, b) => b.score - a.score || b.item.year - a.item.year || a.index - b.index)
+    .slice(0, limit)
+    .map(row => row.item);
 }
