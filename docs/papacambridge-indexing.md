@@ -37,7 +37,15 @@ To export just one subject, pass its ID, for example:
 npm run export:paper-urls -- --subject physics --from 2012 --to 2026
 ```
 
-The command writes a text URL list plus a JSON manifest with selector metadata. By default, it exports every URL implied by the Paper Finder selectors; some combinations may not exist on the source. To attempt filtering to URLs confirmed by concurrent HTTP HEAD checks, add `--check` (some servers do not support HEAD consistently, so inspect the resulting list).
+The command writes a text URL list plus a JSON manifest with selector metadata.
+
+To generate the selector URLs **and** run the PDF segmentation/indexing step in one command, use:
+
+```bash
+npm run index:papers
+```
+
+This expands the Paper Finder's supported subject/qualification/paper/session/variant combinations across 2012–2026, then attempts to download and segment every candidate PDF into `public/question-index.json`. It can take a long time and many candidate links may not exist. For safer testing, first run the exporter for one subject or a narrower year range and run the importer on that smaller list. By default, it exports every URL implied by the Paper Finder selectors; some combinations may not exist on the source. To attempt filtering to URLs confirmed by concurrent HTTP HEAD checks, add `--check` (some servers do not support HEAD consistently, so inspect the resulting list).
 
 Then run the importer on the generated list:
 
