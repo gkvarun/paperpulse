@@ -68,6 +68,18 @@ for (const sourceUrl of urls) {
   }
   console.log(filename + ": extracted text from " + extracted + "/" + doc.numPages + " pages");
 }
+// Precompute document vectors during ingestion so the student browser embeds only the query.
+try {
+  const { pipeline } = await import("@xenova/transformers");
+  const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+  for (let i = 0; i < records.length; i++) {
+    const output = await extractor(records[i].topic + ". " + records[i].prompt, { pooling: "mean", normalize: true });
+    records[i].embedding = Array.from(output.data);
+    if ((i + 1) % 25 === 0 || i + 1 === records.length) console.log("Embedded", i + 1, "of", records.length);
+  }
+} catch (error) {
+  console.warn("Embedding model unavailable during import; index will use keyword fallback.", error);
+}
 await fs.mkdir(path.dirname(outputFile), { recursive: true });
 await fs.writeFile(outputFile, JSON.stringify({ generatedAt: new Date().toISOString(), count: records.length, records }, null, 2));
 console.log("Wrote " + records.length + " page passages to " + outputFile + ". These are not yet segmented into individual questions or topic-labelled.");
