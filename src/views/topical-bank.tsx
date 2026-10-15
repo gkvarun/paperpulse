@@ -64,16 +64,16 @@ export function TopicalBank() {
 
   useEffect(() => {
     let cancelled = false; setSearching(true);
-    const run = async () => { const rows = search.trim() ? await semanticSearch(search, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows as typeof QUESTIONS); setSearchMode(search.trim() ? "semantic" : "keyword"); setSearching(false); } };
+    const retrievalQuery = [search.trim(), ...topics].filter(Boolean).join(" ");\n    const run = async () { const rows = retrievalQuery ? await semanticSearch(retrievalQuery, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows as typeof QUESTIONS); setSearchMode(search.trim() ? "semantic" : "keyword"); setSearching(false); } };
     void run().catch((e) => { console.error("Semantic search failed", e); if (!cancelled) { setSemanticResults(corpus as typeof QUESTIONS); setSearchMode("keyword"); setSearching(false); } });
     return () => { cancelled = true; };
-  }, [search, corpus]);
+  }, [search, topics, corpus]);
 
   const results = useMemo(() => {
     return semanticResults.filter(
       (x) =>
         x.subjectId === subjectId &&
-        (topics.length === 0 || topics.includes(x.topic)) &&
+        (topics.length === 0 || topics.includes(x.topic) || (x.topic === "Unclassified" && (x as any).recordType === "page-passage")) &&
         (component === "all" || Number(x.paper[0]) === component) &&
         x.year >= Math.min(from, to) &&
         x.year <= Math.max(from, to)
