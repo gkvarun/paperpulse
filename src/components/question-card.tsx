@@ -17,6 +17,9 @@ export function QuestionCard({ question }: { question: TopicalQuestion }) {
   const result = questionResults[question.id];
   const ref = { code, series: question.series, year: question.year, paper: question.paper };
   const panelId = `ms-${question.id}`;
+  const pagePassage = (question as any).recordType === "page-passage";
+  const sourceUrl = (question as any).sourceUrl as string | undefined;
+  const sourcePage = (question as any).sourcePage as number | undefined;
 
   return (
     <motion.li layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
@@ -32,11 +35,11 @@ export function QuestionCard({ question }: { question: TopicalQuestion }) {
             {question.marks} {question.marks === 1 ? "mark" : "marks"}
           </Badge>
           <a
-            href={paperUrl(ref, "qp")}
+            href={sourceUrl || paperUrl(ref, "qp")}
             target="_blank"
             rel="noreferrer"
             className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground"
-            aria-label={`Open source paper ${code} ${question.series}${String(question.year).slice(-2)} ${question.paper}`}
+            aria-label={pagePassage ? "Open original PDF source" : `Open source paper ${code} ${question.series}${String(question.year).slice(-2)} ${question.paper}`}
           >
             {code}
             <ExternalLink className="size-3" aria-hidden="true" />
@@ -54,7 +57,7 @@ export function QuestionCard({ question }: { question: TopicalQuestion }) {
             Mark Scheme
             <ChevronDown className={clsx("size-3.5 transition-transform", open && "rotate-180")} aria-hidden="true" />
           </Button>
-          <div className="ml-auto flex items-center gap-1" role="group" aria-label="Self-assessment">
+          {!pagePassage && <div className="ml-auto flex items-center gap-1" role="group" aria-label="Self-assessment">
             <button
               type="button"
               onClick={() => setQuestionResult(question.id, result === "correct" ? null : "correct")}
