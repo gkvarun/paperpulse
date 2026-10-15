@@ -4,7 +4,8 @@ import { Library, RotateCcw, Search } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store";
 import { QUESTIONS } from "../data/questions";
-import { SUBJECTS, TRACKER_YEARS, YEARS, getSubject, subjectPapers } from "../data/subjects";
+import { QUALIFICATIONS, SERIES, SUBJECTS, TRACKER_YEARS, YEARS, getSubject, subjectCode, subjectPapers, variantsFor, type Qualification } from "../data/subjects";
+import { paperUrl, type PaperRef } from "../lib/papacambridge";
 import { Button, Card, EmptyState, Field, PageHeader, Select } from "../components/ui";
 import { QuestionCard } from "../components/question-card";
 import { embedText, semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
@@ -17,6 +18,8 @@ export function TopicalBank() {
   const [subjectId, setSubjectId] = useState(activeSubjectId);
   const [topics, setTopics] = useState<string[]>([]);
   const [component, setComponent] = useState<number | "all">("all");
+  const [qualification, setQualification] = useState<Qualification>("A-Level");
+  const [showSourcePapers, setShowSourcePapers] = useState(false);
   const [from, setFrom] = useState(MIN_YEAR);
   const [to, setTo] = useState(MAX_YEAR);
   const [search, setSearch] = useState("");
@@ -27,7 +30,35 @@ export function TopicalBank() {
   const [searchMode, setSearchMode] = useState<"semantic" | "keyword">("keyword");
 
   const subject = getSubject(subjectId);
-  const papers = subjectPapers(subject);
+  const papers = subjectPapers(subject, qualification);
+  const sourcePapers = useMemo(() => {
+    const code = subjectCode(subject, qualification);
+    if (!code) return [];
+    const rows: { year: number; session: string; paper: string; url: string }[] = [];
+    for (const year of YEARS.filter((y) => y >= Math.min(from, to) && y <= Math.max(from, to))) {
+      for (const session of SERIES) {
+        for (const paper of papers) {
+          if (component !== "all" && paper.number !== component) continue;
+          for (const variant of variantsFor(session.code)) {
+            const ref: PaperRef = { code, series: session.code, year, paper: String(paper.number) + String(variant) };
+            rows.push({ year, session: session.label, paper: ref.paper, url: paperUrl(ref, "qp") });
+          }
+        }
+      }
+    }
+    return rows.sort((a, b) => b.year - a.year || a.session.localeCompare(b.session) || a.paper.localeCompare(b.paper));
+  }, [subject, qualification, papers, from, to, component]);
+
+  const downloadSourceList = () => {
+    const content = sourcePapers.map((paper) => paper.url).join(String.fromCharCode(10)) + String.fromCharCode(10);
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "paperpulse-" + subject.id + "-" + qualification.toLowerCase().replaceAll(" ", "-") + "-" + Math.min(from, to) + "-" + Math.max(from, to) + "-pdf-urls.txt";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     setSubjectId(activeSubjectId);
@@ -152,6 +183,14 @@ export function TopicalBank() {
             </div>
           </fieldset>
 
+          <Field label="Qualification">
+            {(id) => (
+              <Select id={id} value={qualification} onChange={(e) => { setQualification(e.target.value as Qualification); setComponent("all"); }}>
+                {QUALIFICATIONS.filter((q) => Boolean(subject.codes[q])).map((q) => <option key={q} value={q}>{q}</option>)}
+              </Select>
+            )}
+          </Field>
+
           <Field label="Paper type">
             {(id) => (
               <Select id={id} value={component} onChange={(e) => setComponent(e.target.value === "all" ? "all" : Number(e.target.value))}>
@@ -203,6 +242,29 @@ export function TopicalBank() {
                 {preset.label}
               </button>
             ))}
+          </div>
+
+          <div className="rounded-lg border border-line p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Source paper selector</p>
+                <p className="mt-1 text-xs text-muted">{sourcePapers.length.toLocaleString()} generated PDF links for the selected subject, qualification, paper and years.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setShowSourcePapers((v) => !v)}>{showSourcePapers ? "Hide" : "View"}</Button>
+            </div>
+            <Button variant="outline" size="sm" className="mt-3 w-full" onClick={downloadSourceList} disabled={!sourcePapers.length}>Download PDF URL list</Button>
+            {showSourcePapers && (
+              <div className="mt-3 max-h-56 overflow-y-auto border-t border-line pt-2">
+                {sourcePapers.slice(0, 100).map((p) => (
+                  <a key={p.url} href={p.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 py-1.5 text-xs hover:text-foreground">
+                    <span>{p.year} · {p.session} · Paper {p.paper}</span>
+                    <span className="text-muted">PDF ↗</span>
+                  </a>
+                ))}
+                {sourcePapers.length > 100 && <p className="pt-2 text-xs text-muted">Showing first 100 links. Download the URL list to get all {sourcePapers.length.toLocaleString()} generated links.</p>}
+              </div>
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed text-muted">These are candidate source links, not confirmed available papers. To make their questions searchable, run the PDF importer on the downloaded list and publish the resulting question index. Browsers cannot reliably bulk-read third-party PDFs directly because of cross-origin restrictions.</p>
           </div>
 
           <Button variant="ghost" size="sm" onClick={reset} className="self-start">
