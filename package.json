@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "export:paper-urls": "tsx scripts/export-paper-selector-urls.ts"
+    "export:paper-urls": "tsx scripts/export-paper-selector-urls.ts",
+    "index:papers": "npm run export:paper-urls -- --from 2012 --to 2026 --out ./papacambridge-pdf-urls.txt && node scripts/import-papacambridge-pdfs.mjs ./papacambridge-pdf-urls.txt ./public/question-index.json"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
