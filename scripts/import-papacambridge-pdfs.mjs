@@ -45,9 +45,9 @@ for (const sourceUrl of urls) {
   const name = filename.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   const code = (filename + " " + url.pathname).match(/(?:^|\D)(970[0-9]|96[0-9]{2}|92[0-9]{2}|06[0-9]{2}|05[0-9]{2}|04[0-9]{2})(?:\D|$)/)?.[1] || "";
   const subjectId = subjectByCode[code] || "other";
-  const yearMatch = (filename + " " + url.pathname).match(/(?:19|20)\d{2}|(?:^|[_-])(?:s|w|m)(\d{2})(?:[_-]|\b)/i);\n  const year = yearMatch ? Number(yearMatch[0].match(/(?:19|20)\d{2}/)?.[0] || ((Number(yearMatch[1]) >= 50 ? "19" : "20") + yearMatch[1])) : null;
-  const series = /(?:\b|[_-])(m|march)(?:\b|[_-])/i.test(filename) ? "m" : /(?:\b|[_-])(w|winter|oct|october)(?:\b|[_-])/i.test(filename) ? "w" : /(?:\b|[_-])(s|summer|may|june)(?:\b|[_-])/i.test(filename) ? "s" : "unknown";
-  const paper = (filename + " " + url.pathname).match(/(?:paper|p)[_-]?(\d{1,2})[_-]?(\d{1,2})/i)?.slice(1).join("") || "0";
+  const yearMatch = (filename + " " + url.pathname).match(/(?:19|20)\d{2}|(?:^|[_-])(?:s|w|m)(\d{2})(?:[_-]|\b)/i);
+  const series = /(?:^|[_-])m\d{2}(?:[_-]|\b)|march/i.test(filename) ? "m" : /(?:^|[_-])w\d{2}(?:[_-]|\b)|winter|october/i.test(filename) ? "w" : /(?:^|[_-])s\d{2}(?:[_-]|\b)|summer|may|june/i.test(filename) ? "s" : "unknown";
+  const paper = (filename + " " + url.pathname).match(/(?:qp|ms|paper)[_-]?(\d{1,2})/i)?.[1] || "0";
   const doc = await pdfjs.getDocument({ data: bytes }).promise;
   let extracted = 0;
   for (let pageNo = 1; pageNo <= doc.numPages; pageNo++) {
