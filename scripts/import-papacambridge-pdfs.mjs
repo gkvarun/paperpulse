@@ -137,7 +137,7 @@ function segmentQuestions(lines, meta) {
   let lastNumber = 0;
   for (const line of lines) {
     const found = mainQuestionStart(line);
-    if (found && (found.number === lastNumber + 1 || found.number === 1 || (found.number > lastNumber && found.number <= lastNumber + 3))) {
+    if (found && (found.number > lastNumber && found.number <= 40)) {
       current = { number: found.number, lines: [found.rest], startPage: line.page, endPage: line.page };
       main.push(current);
       lastNumber = found.number;
@@ -153,13 +153,16 @@ function segmentQuestions(lines, meta) {
     if (fullText.length < 20) continue;
     const parts = [];
     let part = null;
+    const stem = [];
     for (const text of q.lines) {
       const found = subpartStart(text);
       if (found) {
         part = { label: found.label, lines: [found.rest] };
         parts.push(part);
       } else if (part) part.lines.push(text);
+      else stem.push(text);
     }
+    const stemText = normalize(stem.join(" "));
     const topic = classifyTopic(fullText, meta.subjectId);
     const addRecord = (suffix, label, prompt, startPage, endPage, parentQuestionNumber) => {
       const cleaned = normalize(prompt);
@@ -179,7 +182,7 @@ function segmentQuestions(lines, meta) {
     };
     // Emit sub-question records if clear parts exist; otherwise retain the full question.
     if (parts.length) {
-      for (const p of parts) addRecord("-" + p.label, q.number + p.label, p.lines.join(" "), q.startPage, q.endPage, q.number);
+      for (const p of parts) addRecord("-" + p.label, q.number + p.label, [stemText, p.lines.join(" ")].filter(Boolean).join(" "), q.startPage, q.endPage, q.number);
     } else {
       addRecord("", String(q.number), fullText, q.startPage, q.endPage, null);
     }
