@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Library, RotateCcw, Search } from "lucide-react";
-import clsx from "clsx";
 import { useApp } from "../store";
 import { QUESTIONS } from "../data/questions";
 import { QUALIFICATIONS, SERIES, SUBJECTS, TRACKER_YEARS, YEARS, getSubject, subjectCode, subjectPapers, variantsFor, type Qualification } from "../data/subjects";
 import { paperUrl, type PaperRef } from "../lib/papacambridge";
 import { Button, Card, EmptyState, Field, PageHeader, Select } from "../components/ui";
 import { QuestionCard } from "../components/question-card";
-import { embedText, semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
+import { semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
 
 const MIN_YEAR = YEARS[YEARS.length - 1];
 const MAX_YEAR = YEARS[0];
@@ -16,7 +15,6 @@ const MAX_YEAR = YEARS[0];
 export function TopicalBank() {
   const { activeSubjectId, topicalIntent, consumeTopicalIntent, worksheet, setWorksheet } = useApp();
   const [subjectId, setSubjectId] = useState(activeSubjectId);
-  const [topics, setTopics] = useState<string[]>([]);
   const [component, setComponent] = useState<number | "all">("all");
   const [qualification, setQualification] = useState<Qualification>("A-Level");
   const [showSourcePapers, setShowSourcePapers] = useState(false);
@@ -25,9 +23,8 @@ export function TopicalBank() {
   const [search, setSearch] = useState("");
   const [corpus, setCorpus] = useState<IndexedQuestion[]>(QUESTIONS as unknown as IndexedQuestion[]);
   const [corpusSource, setCorpusSource] = useState<"bundled" | "index" | "api">("bundled");
-  const [semanticResults, setSemanticResults] = useState<typeof QUESTIONS>(QUESTIONS);
+  const [semanticResults, setSemanticResults] = useState<IndexedQuestion[]>(QUESTIONS as unknown as IndexedQuestion[]);
   const [searching, setSearching] = useState(false);
-  const [searchMode, setSearchMode] = useState<"semantic" | "keyword">("keyword");
 
   const subject = getSubject(subjectId);
   const papers = subjectPapers(subject, qualification);
@@ -62,15 +59,13 @@ export function TopicalBank() {
 
   useEffect(() => {
     setSubjectId(activeSubjectId);
-    setTopics([]);
     setComponent("all");
   }, [activeSubjectId]);
 
   useEffect(() => {
     if (!topicalIntent) return;
     if (topicalIntent.subjectId) setSubjectId(topicalIntent.subjectId);
-    setTopics(topicalIntent.topic ? [topicalIntent.topic] : []);
-    setSearch(topicalIntent.search ?? "");
+    setSearch([topicalIntent.search, topicalIntent.topic].filter(Boolean).join(" "));
     setComponent("all");
     consumeTopicalIntent();
   }, [topicalIntent, consumeTopicalIntent]);
@@ -86,35 +81,25 @@ export function TopicalBank() {
     }; void load(); return () => { cancelled = true; };
   }, []);
 
-  // Corpus embeddings are generated during ingestion; only the user's query is embedded here.
-
   useEffect(() => {
     let cancelled = false; setSearching(true);
-    const retrievalQuery = [search.trim(), ...topics].filter(Boolean).join(" ");
-    const run = async () => { const rows = retrievalQuery ? await semanticSearch(retrievalQuery, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows as typeof QUESTIONS); setSearchMode(search.trim() ? "semantic" : "keyword"); setSearching(false); } };
+    const retrievalQuery = search.trim();
+    const run = async () => { const rows = retrievalQuery ? await semanticSearch(retrievalQuery, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows); setSearching(false); } };
     void run().catch((e) => { console.error("Semantic search failed", e); if (!cancelled) { setSemanticResults(corpus as typeof QUESTIONS); setSearchMode("keyword"); setSearching(false); } });
     return () => { cancelled = true; };
-  }, [search, topics, corpus]);
+  }, [search, corpus]);
 
   const results = useMemo(() => {
     return semanticResults.filter(
       (x) =>
         x.subjectId === subjectId &&
-        (topics.length === 0 || topics.includes(x.topic) || (x.topic === "Unclassified" && Boolean((x as any).recordType))) &&
         (component === "all" || Number(x.paper[0]) === component) &&
         x.year >= Math.min(from, to) &&
         x.year <= Math.max(from, to)
     ).sort((a, b) => b.year - a.year);
-  }, [semanticResults, subjectId, topics, component, from, to]);
-
-  const counts = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const x of corpus) if (x.subjectId === subjectId) map.set(x.topic, (map.get(x.topic) ?? 0) + 1);
-    return map;
-  }, [subjectId, corpus]);
+  }, [semanticResults, subjectId, component, from, to]);
 
   const reset = () => {
-    setTopics([]);
     setComponent("all");
     setFrom(MIN_YEAR);
     setTo(MAX_YEAR);
@@ -127,7 +112,7 @@ export function TopicalBank() {
     <div>
       <PageHeader
         title="Topical Bank"
-        description="Filter past paper questions by topic, component and year, check them against the mark scheme, and collect them into a worksheet."
+        description="Search indexed past-paper questions by words or phrases, filter by qualification, subject, paper and year, and collect questions into a worksheet."
         actions={
           <Button variant="outline" disabled={notAdded.length === 0} onClick={() => setWorksheet([...worksheet, ...notAdded.map((r) => r.id)])}>
             Add all {notAdded.length > 0 ? notAdded.length : ""} to worksheet
@@ -144,8 +129,7 @@ export function TopicalBank() {
                 value={subjectId}
                 onChange={(e) => {
                   setSubjectId(e.target.value);
-                  setTopics([]);
-                  setComponent("all");
+                                setComponent("all");
                 }}
               >
                 {SUBJECTS.map((s) => (
@@ -157,31 +141,6 @@ export function TopicalBank() {
             )}
           </Field>
 
-          <fieldset>
-            <legend className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">Topics</legend>
-            <div className="flex flex-wrap gap-1.5">
-              {subject.topics.map((t) => {
-                const active = topics.includes(t);
-                const count = counts.get(t) ?? 0;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setTopics((prev) => (active ? prev.filter((x) => x !== t) : [...prev, t]))}
-                    className={clsx(
-                      "rounded-md border px-2.5 py-1 text-xs font-medium tracking-tight transition-colors",
-                      active ? "border-foreground bg-foreground text-background" : "border-line text-muted hover:border-line-strong hover:text-foreground",
-                      count === 0 && !active && "opacity-50",
-                    )}
-                  >
-                    {t}
-                    <span className="ml-1 opacity-60">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
 
           <Field label="Qualification">
             {(id) => (
@@ -281,18 +240,18 @@ export function TopicalBank() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by topic or question meaning"
+                placeholder="Search question text, keywords or phrases"
                 aria-label="Search within questions"
                 className="h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-sm placeholder:text-muted"
               />
             </div>
             <p className="text-sm text-muted" aria-live="polite">
-              <span className="font-bold text-foreground">{results.length}</span> {results.length === 1 ? (corpusSource === "bundled" ? "question" : "result") : (corpusSource === "bundled" ? "questions" : "results")}{searching ? " · searching…" : search.trim() ? ` · ${searchMode} search` : ""} · {corpusSource === "bundled" ? "demo data" : corpusSource === "api" ? "indexed question API" : "published index"}
+              <span className="font-bold text-foreground">{results.length}</span> {results.length === 1 ? (corpusSource === "bundled" ? "question" : "result") : (corpusSource === "bundled" ? "questions" : "results")}{searching ? " · searching…" : search.trim() ? " · keyword search" : ""} · {corpusSource === "bundled" ? "demo data" : corpusSource === "api" ? "indexed question API" : "published index"}
             </p>
           </div>
 
           {results.length === 0 ? (
-            <EmptyState icon={<Library className="size-5" />} title="No questions match" description="Widen the year range or clear topic filters to see more questions." action={<Button size="sm" onClick={reset}>Reset filters</Button>} />
+            <EmptyState icon={<Library className="size-5" />} title="No questions match" description="Try different keywords or widen the year range to find more questions." action={<Button size="sm" onClick={reset}>Reset filters</Button>} />
           ) : (
             <ul className="flex flex-col gap-3">
               <AnimatePresence mode="popLayout">
