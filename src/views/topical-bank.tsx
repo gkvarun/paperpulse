@@ -7,7 +7,7 @@ import { QUALIFICATIONS, SERIES, SUBJECTS, TRACKER_YEARS, YEARS, getSubject, sub
 import { paperUrl, type PaperRef } from "../lib/papacambridge";
 import { Button, Card, EmptyState, Field, PageHeader, Select } from "../components/ui";
 import { QuestionCard } from "../components/question-card";
-import { semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
+import { keywordSearch, type IndexedQuestion } from "../lib/semantic-search";
 
 const MIN_YEAR = YEARS[YEARS.length - 1];
 const MAX_YEAR = YEARS[0];
@@ -84,7 +84,7 @@ export function TopicalBank() {
   useEffect(() => {
     let cancelled = false; setSearching(true);
     const retrievalQuery = search.trim();
-    const run = async () => { const rows = retrievalQuery ? await semanticSearch(retrievalQuery, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows); setSearching(false); } };
+    const run = async () => { const rows = retrievalQuery ? await keywordSearch(retrievalQuery, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows); setSearching(false); } };
     void run().catch((e) => { console.error("Keyword search failed", e); if (!cancelled) { setSemanticResults(corpus); setSearching(false); } });
     return () => { cancelled = true; };
   }, [search, corpus]);
