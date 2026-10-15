@@ -85,7 +85,7 @@ export function TopicalBank() {
     let cancelled = false; setSearching(true);
     const retrievalQuery = search.trim();
     const run = async () => { const rows = retrievalQuery ? await semanticSearch(retrievalQuery, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows); setSearching(false); } };
-    void run().catch((e) => { console.error("Semantic search failed", e); if (!cancelled) { setSemanticResults(corpus as typeof QUESTIONS); setSearchMode("keyword"); setSearching(false); } });
+    void run().catch((e) => { console.error("Keyword search failed", e); if (!cancelled) { setSemanticResults(corpus); setSearching(false); } });
     return () => { cancelled = true; };
   }, [search, corpus]);
 
@@ -129,7 +129,7 @@ export function TopicalBank() {
                 value={subjectId}
                 onChange={(e) => {
                   setSubjectId(e.target.value);
-                                setComponent("all");
+                  setComponent("all");
                 }}
               >
                 {SUBJECTS.map((s) => (
