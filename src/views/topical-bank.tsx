@@ -7,7 +7,7 @@ import { QUESTIONS } from "../data/questions";
 import { SUBJECTS, TRACKER_YEARS, YEARS, getSubject, subjectPapers } from "../data/subjects";
 import { Button, Card, EmptyState, Field, PageHeader, Select } from "../components/ui";
 import { QuestionCard } from "../components/question-card";
-import { semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
+import { embedText, semanticSearch, type IndexedQuestion } from "../lib/semantic-search";
 
 const MIN_YEAR = YEARS[YEARS.length - 1];
 const MAX_YEAR = YEARS[0];
@@ -23,6 +23,7 @@ export function TopicalBank() {
   const [semanticResults, setSemanticResults] = useState<typeof QUESTIONS>(QUESTIONS);
   const [searching, setSearching] = useState(false);
   const [searchMode, setSearchMode] = useState<"semantic" | "keyword">("semantic");
+  const [embeddedQuestions, setEmbeddedQuestions] = useState<IndexedQuestion[] | null>(null);
 
   const subject = getSubject(subjectId);
   const papers = subjectPapers(subject);
@@ -42,6 +43,19 @@ export function TopicalBank() {
     consumeTopicalIntent();
   }, [topicalIntent, consumeTopicalIntent]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const prepare = async () => {
+      const prepared = await Promise.all(QUESTIONS.map(async (q) => ({
+        ...q,
+        embedding: await embedText(q.topic + ". " + q.prompt),
+      })));
+      if (!cancelled) setEmbeddedQuestions(prepared as unknown as IndexedQuestion[]);
+    };
+    void prepare().catch((error) => console.warn("Question embeddings unavailable; keyword search will be used.", error));
+    return () => { cancelled = true; };
+  }, []);
+
   // Run semantic retrieval over the currently available question records, then apply
   // exact metadata filters. When an indexed corpus/API is configured, its records can
   // be merged here; the bundled seed data is not a complete Cambridge catalogue.
@@ -49,8 +63,9 @@ export function TopicalBank() {
     let cancelled = false;
     setSearching(true);
     const run = async () => {
+      const corpus = embeddedQuestions ?? (QUESTIONS as unknown as IndexedQuestion[]);
       const ranked = search.trim()
-        ? await semanticSearch(search, QUESTIONS as unknown as IndexedQuestion[], 5000)
+        ? await semanticSearch(search, corpus, 5000)
         : QUESTIONS;
       if (!cancelled) {
         setSemanticResults(ranked as typeof QUESTIONS);
@@ -67,7 +82,7 @@ export function TopicalBank() {
       }
     });
     return () => { cancelled = true; };
-  }, [search]);
+  }, [search, embeddedQuestions]);
 
   const results = useMemo(() => {
     return semanticResults.filter(
