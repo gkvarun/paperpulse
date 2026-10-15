@@ -20,10 +20,11 @@ export function TopicalBank() {
   const [from, setFrom] = useState(MIN_YEAR);
   const [to, setTo] = useState(MAX_YEAR);
   const [search, setSearch] = useState("");
+  const [corpus, setCorpus] = useState<IndexedQuestion[]>(QUESTIONS as unknown as IndexedQuestion[]);
+  const [corpusSource, setCorpusSource] = useState<"bundled" | "index" | "api">("bundled");
   const [semanticResults, setSemanticResults] = useState<typeof QUESTIONS>(QUESTIONS);
   const [searching, setSearching] = useState(false);
-  const [searchMode, setSearchMode] = useState<"semantic" | "keyword">("semantic");
-  const [embeddedQuestions, setEmbeddedQuestions] = useState<IndexedQuestion[] | null>(null);
+  const [searchMode, setSearchMode] = useState<"semantic" | "keyword">("keyword");
 
   const subject = getSubject(subjectId);
   const papers = subjectPapers(subject);
@@ -43,46 +44,30 @@ export function TopicalBank() {
     consumeTopicalIntent();
   }, [topicalIntent, consumeTopicalIntent]);
 
+  // Load indexed questions from the configured API or published JSON index.
   useEffect(() => {
     let cancelled = false;
-    const prepare = async () => {
-      const prepared = await Promise.all(QUESTIONS.map(async (q) => ({
-        ...q,
-        embedding: await embedText(q.topic + ". " + q.prompt),
-      })));
-      if (!cancelled) setEmbeddedQuestions(prepared as unknown as IndexedQuestion[]);
-    };
-    void prepare().catch((error) => console.warn("Question embeddings unavailable; keyword search will be used.", error));
-    return () => { cancelled = true; };
+    const load = async () => {
+      const api = import.meta.env.VITE_TOPICAL_SEARCH_API_URL?.trim();
+      if (api) { try { const r = await fetch(api); if (!r.ok) throw new Error("API " + r.status); const p = await r.json(); const rows = Array.isArray(p) ? p : p.questions ?? p.records; if (Array.isArray(rows) && rows.length) { if (!cancelled) { setCorpus(rows); setCorpusSource("api"); } return; } } catch (e) { console.warn("Question API failed; trying local index.", e); } }
+      try { const r = await fetch("/question-index.json"); if (r.ok) { const p = await r.json(); const rows = Array.isArray(p) ? p : p.questions ?? p.records; const valid = Array.isArray(rows) ? rows.filter((x: any) => x && x.id && x.subjectId && x.topic && x.prompt && Number.isFinite(Number(x.year)) && x.paper) : []; if (valid.length) { if (!cancelled) { setCorpus(valid); setCorpusSource("index"); } return; } } } catch (e) { console.warn("Question index unavailable.", e); }
+      if (!cancelled) { setCorpus(QUESTIONS as unknown as IndexedQuestion[]); setCorpusSource("bundled"); }
+    }; void load(); return () => { cancelled = true; };
   }, []);
 
-  // Run semantic retrieval over the currently available question records, then apply
-  // exact metadata filters. When an indexed corpus/API is configured, its records can
-  // be merged here; the bundled seed data is not a complete Cambridge catalogue.
   useEffect(() => {
     let cancelled = false;
-    setSearching(true);
-    const run = async () => {
-      const corpus = embeddedQuestions ?? (QUESTIONS as unknown as IndexedQuestion[]);
-      const ranked = search.trim()
-        ? await semanticSearch(search, corpus, 5000)
-        : QUESTIONS;
-      if (!cancelled) {
-        setSemanticResults(ranked as typeof QUESTIONS);
-        setSearchMode(search.trim() ? "semantic" : "keyword");
-        setSearching(false);
-      }
-    };
-    void run().catch((error) => {
-      console.error("Topical semantic search failed", error);
-      if (!cancelled) {
-        setSemanticResults(QUESTIONS);
-        setSearchMode("keyword");
-        setSearching(false);
-      }
-    });
+    const prepare = async () => { const rows = await Promise.all(corpus.map(async (q) => { if (q.embedding?.length) return q; const embedding = await embedText(q.topic + ". " + q.prompt); return embedding ? { ...q, embedding } : q; })); if (!cancelled) setCorpus(rows); };
+    void prepare().catch((e) => console.warn("Embedding preparation failed.", e));
     return () => { cancelled = true; };
-  }, [search, embeddedQuestions]);
+  }, [corpusSource]);
+
+  useEffect(() => {
+    let cancelled = false; setSearching(true);
+    const run = async () => { const rows = search.trim() ? await semanticSearch(search, corpus, 5000) : corpus; if (!cancelled) { setSemanticResults(rows as typeof QUESTIONS); setSearchMode(search.trim() ? "semantic" : "keyword"); setSearching(false); } };
+    void run().catch((e) => { console.error("Semantic search failed", e); if (!cancelled) { setSemanticResults(corpus as typeof QUESTIONS); setSearchMode("keyword"); setSearching(false); } });
+    return () => { cancelled = true; };
+  }, [search, corpus]);
 
   const results = useMemo(() => {
     return semanticResults.filter(
@@ -97,9 +82,9 @@ export function TopicalBank() {
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const x of QUESTIONS) if (x.subjectId === subjectId) map.set(x.topic, (map.get(x.topic) ?? 0) + 1);
+    for (const x of corpus) if (x.subjectId === subjectId) map.set(x.topic, (map.get(x.topic) ?? 0) + 1);
     return map;
-  }, [subjectId]);
+  }, [subjectId, corpus]);
 
   const reset = () => {
     setTopics([]);
